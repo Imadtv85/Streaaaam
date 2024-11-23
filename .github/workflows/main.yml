@@ -21,17 +21,15 @@ jobs:
         # إعداد المتغيرات
         STREAM_URL="rtmps://live-api-s.facebook.com:443/rtmp/"
         STREAM_KEY="FB-122166222230260989-0-AbzzM6v3SqBiOlmm"  # مفتاح البث الخاص بك
-        M3U8_URL="https://live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8"  # رابط M3U8 الخاص بك
+        M3U8_URL="live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8"  # رابط M3U8 بدون بروتوكول
         LOG_FILE="stream_log.txt"
         MAX_RETRIES=10  # الحد الأقصى لمحاولات إعادة الاتصال
 
-        # التحقق من بروتوكول M3U8 (HTTPS أو HTTP)
-        if [[ $M3U8_URL == https://* ]]; then
-          echo "Using HTTPS URL for streaming"
-        elif [[ $M3U8_URL == http://* ]]; then
-          echo "Using HTTP URL for streaming"
+        # التحقق من صحة الرابط (بدون https أو http)
+        if [[ $M3U8_URL =~ ^[a-zA-Z0-9.-]+$ ]]; then
+          echo "Valid URL format for streaming"
         else
-          echo "Invalid URL format. Please use HTTP or HTTPS."
+          echo "Invalid URL format. Please provide a valid M3U8 URL."
           exit 1
         fi
 
