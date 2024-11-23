@@ -1,77 +1,28 @@
-name: Facebook VIP Live Stream
+name: Stream to Facebook Live (Stable and High Quality)
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # تشغيل كل 5 دقائق (يمكنك تعديل ذلك)
-  workflow_dispatch:  # يتيح لك تشغيله يدويًا
+  push:
+    branches:
+      - main
+  workflow_dispatch: # لبدء البث يدويًا من GitHub
 
 jobs:
-  facebook_stream:
+  stream:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up FFmpeg
-      run: sudo apt-get install -y ffmpeg
+      - name: Set up FFmpeg
+        run: |
+          sudo apt update
+          sudo apt install -y ffmpeg
 
-    - name: Facebook VIP Live Stream with Watermark
-      run: |
-        # إعداد المتغيرات
-        STREAM_URL="rtmps://live-api-s.facebook.com:443/rtmp/"
-        STREAM_KEY="FB-122166222230260989-0-AbzzM6v3SqBiOlmm"  # مفتاح البث الخاص بك
-        M3U8_URL="live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8"  # رابط M3U8 بدون بروتوكول
-        LOG_FILE="stream_log.txt"
-        MAX_RETRIES=10  # الحد الأقصى لمحاولات إعادة الاتصال
-        STOP_FILE="stop_stream.txt"  # ملف إيقاف البث
-
-        # تحقق من صحة الرابط بدون البروتوكول
-        if [[ -z "$M3U8_URL" ]]; then
-          echo "M3U8 URL is not set. Exiting..."
-          exit 1
-        fi
-
-        # تأكد من أن الرابط لا يحتوي على بروتوكول
-        if [[ "$M3U8_URL" =~ ^https?:// ]]; then
-          echo "URL contains protocol. Removing protocol..."
-          M3U8_URL=${M3U8_URL#https://}  # إزالة https://
-          M3U8_URL=${M3U8_URL#http://}  # إزالة http://
-        fi
-
-        # إعدادات FFmpeg للبث مع العلامة المائية
-        ffmpeg_args="-re -i $M3U8_URL -c:v libx264 -c:a aac -f flv -preset veryfast -tune film -g 60 \
-        -max_reload 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -buffer_size 4096k \
-        -flvflags no_duration_filesize -loglevel info \
-        -vf \"drawtext=text='IMADTV.COM':fontcolor=white:fontsize=24:x=10:y=H-40\" \
-        -strict -2"
-
-        # وظيفة إعادة المحاولة مع زر إيقاف
-        attempt=0
-        until [ $attempt -ge $MAX_RETRIES ]; do
-          echo "Attempt $((attempt+1)) of $MAX_RETRIES..."
-          
-          # تحقق من وجود ملف إيقاف البث
-          if [ -f "$STOP_FILE" ]; then
-            echo "Stop file detected. Stopping the stream..."
-            exit 0
-          fi
-
-          # تشغيل FFmpeg
-          ffmpeg $ffmpeg_args $STREAM_URL$STREAM_KEY >> $LOG_FILE 2>&1
-
-          # التحقق من حالة FFmpeg بعد البث
-          if grep -q "Exiting normally" $LOG_FILE; then
-            echo "Stream ended successfully."
-            exit 0
-          fi
-
-          # إعادة المحاولة في حالة الفشل
-          echo "Stream attempt $((attempt+1)) failed. Retrying in 10 seconds..."
-          attempt=$((attempt+1))
-          sleep 10
-        done
-
-        # إذا فشلت جميع المحاولات
-        echo "All attempts failed. Please check the log file for details: $LOG_FILE"
-        exit 1
+      - name: Start stable stream
+        env:
+          STREAM_KEY: ${{ secrets.FACEBOOK_STREAM_KEY }}
+        run: |
+          ffmpeg -re -i "https://live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8" \
+          -c:v libx264 -preset veryfast -crf 23 -maxrate 3000k -bufsize 6000k \
+          -g 50 -c:a aac -b:a 128k -ar 44100 -f flv \
+          "rtmps://live-api-s.facebook.com:443/rtmp/${STREAM_KEY}"
