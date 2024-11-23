@@ -39,7 +39,8 @@ jobs:
         ffmpeg_args="-re -i $M3U8_URL -c:v libx264 -c:a aac -f flv -preset veryfast -tune film -g 60 \
         -max_reload 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -buffer_size 4096k \
         -flvflags no_duration_filesize -loglevel info \
-        -vf \"drawtext=text='IMADTV.COM':fontcolor=white:fontsize=24:x=10:y=H-40\""
+        -vf \"drawtext=text='IMADTV.COM':fontcolor=white:fontsize=24:x=10:y=H-40\" \
+        -strict -2"
 
         # وظيفة إعادة المحاولة
         attempt=0
