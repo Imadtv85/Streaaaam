@@ -24,26 +24,38 @@ jobs:
         M3U8_URL="live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8"  # رابط M3U8 بدون بروتوكول
         LOG_FILE="stream_log.txt"
         MAX_RETRIES=10  # الحد الأقصى لمحاولات إعادة الاتصال
+        STOP_FILE="stop_stream.txt"  # ملف إيقاف البث
 
-        # التحقق من صحة الرابط (بدون https أو http)
-        if [[ $M3U8_URL =~ ^[a-zA-Z0-9.-]+$ ]]; then
-          echo "Valid URL format for streaming"
-        else
-          echo "Invalid URL format. Please provide a valid M3U8 URL."
+        # تحقق من صحة الرابط بدون البروتوكول
+        if [[ -z "$M3U8_URL" ]]; then
+          echo "M3U8 URL is not set. Exiting..."
           exit 1
         fi
 
-        # إعدادات FFmpeg للبث مع العلامة المائية:
+        # تأكد من أن الرابط لا يحتوي على بروتوكول
+        if [[ "$M3U8_URL" =~ ^https?:// ]]; then
+          echo "URL contains protocol. Removing protocol..."
+          M3U8_URL=${M3U8_URL#https://}  # إزالة https://
+          M3U8_URL=${M3U8_URL#http://}  # إزالة http://
+        fi
+
+        # إعدادات FFmpeg للبث مع العلامة المائية
         ffmpeg_args="-re -i $M3U8_URL -c:v libx264 -c:a aac -f flv -preset veryfast -tune film -g 60 \
         -max_reload 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -buffer_size 4096k \
         -flvflags no_duration_filesize -loglevel info \
         -vf \"drawtext=text='IMADTV.COM':fontcolor=white:fontsize=24:x=10:y=H-40\" \
         -strict -2"
 
-        # وظيفة إعادة المحاولة
+        # وظيفة إعادة المحاولة مع زر إيقاف
         attempt=0
         until [ $attempt -ge $MAX_RETRIES ]; do
           echo "Attempt $((attempt+1)) of $MAX_RETRIES..."
+          
+          # تحقق من وجود ملف إيقاف البث
+          if [ -f "$STOP_FILE" ]; then
+            echo "Stop file detected. Stopping the stream..."
+            exit 0
+          fi
 
           # تشغيل FFmpeg
           ffmpeg $ffmpeg_args $STREAM_URL$STREAM_KEY >> $LOG_FILE 2>&1
