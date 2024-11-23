@@ -1,0 +1,66 @@
+name: Facebook VIP Live Stream
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # تشغيل كل 5 دقائق (يمكنك تعديل ذلك)
+  workflow_dispatch:  # يتيح لك تشغيله يدويًا
+
+jobs:
+  facebook_stream:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+
+    - name: Set up FFmpeg
+      run: sudo apt-get install -y ffmpeg
+
+    - name: Facebook VIP Live Stream with Watermark
+      run: |
+        # إعداد المتغيرات
+        STREAM_URL="rtmps://live-api-s.facebook.com:443/rtmp/"
+        STREAM_KEY="FB-122166222230260989-0-AbzzM6v3SqBiOlmm"  # مفتاح البث الخاص بك
+        M3U8_URL="https://live4.beinconnect.us/YallaGoalApp/beINSports1.m3u8"  # رابط M3U8 الخاص بك
+        LOG_FILE="stream_log.txt"
+        MAX_RETRIES=10  # الحد الأقصى لمحاولات إعادة الاتصال
+
+        # التحقق من بروتوكول M3U8 (HTTPS أو HTTP)
+        if [[ $M3U8_URL == https://* ]]; then
+          echo "Using HTTPS URL for streaming"
+        elif [[ $M3U8_URL == http://* ]]; then
+          echo "Using HTTP URL for streaming"
+        else
+          echo "Invalid URL format. Please use HTTP or HTTPS."
+          exit 1
+        fi
+
+        # إعدادات FFmpeg للبث مع العلامة المائية:
+        ffmpeg_args="-re -i $M3U8_URL -c:v libx264 -c:a aac -f flv -preset veryfast -tune film -g 60 \
+        -max_reload 1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -buffer_size 4096k \
+        -flvflags no_duration_filesize -loglevel info \
+        -vf \"drawtext=text='IMADTV.COM':fontcolor=white:fontsize=24:x=10:y=H-40\""
+
+        # وظيفة إعادة المحاولة
+        attempt=0
+        until [ $attempt -ge $MAX_RETRIES ]; do
+          echo "Attempt $((attempt+1)) of $MAX_RETRIES..."
+
+          # تشغيل FFmpeg
+          ffmpeg $ffmpeg_args $STREAM_URL$STREAM_KEY >> $LOG_FILE 2>&1
+
+          # التحقق من حالة FFmpeg بعد البث
+          if grep -q "Exiting normally" $LOG_FILE; then
+            echo "Stream ended successfully."
+            exit 0
+          fi
+
+          # إعادة المحاولة في حالة الفشل
+          echo "Stream attempt $((attempt+1)) failed. Retrying in 10 seconds..."
+          attempt=$((attempt+1))
+          sleep 10
+        done
+
+        # إذا فشلت جميع المحاولات
+        echo "All attempts failed. Please check the log file for details: $LOG_FILE"
+        exit 1
